@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Catalog.Application.Products.Commands;
 
-public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, Result<Guid>>
+public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, Result<Product>>
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<CreateProductCommandHandler> _logger;
@@ -17,7 +17,7 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
         _logger = logger;
     }
 
-    public async Task<Result<Guid>> Handle(CreateProductCommand request, CancellationToken cancellationToken)
+    public async Task<Result<Product>> Handle(CreateProductCommand request, CancellationToken cancellationToken)
     {
         try
         {
@@ -32,17 +32,17 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
 
             _logger.LogInformation("Product created successfully with ID: {ProductId}", product.Id);
 
-            return Result.Success(product.Id);
+            return Result.Success(product);
         }
         catch (ArgumentException ex)
         {
             _logger.LogWarning("Failed to create product: {Error}", ex.Message);
-            return Result.Failure<Guid>(ex.Message);
+            return Result.Failure<Product>(ex.Message);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error occurred while creating product");
-            return Result.Failure<Guid>("An unexpected error occurred while creating the product");
+            return Result.Failure<Product>("An unexpected error occurred while creating the product");
         }
     }
 }

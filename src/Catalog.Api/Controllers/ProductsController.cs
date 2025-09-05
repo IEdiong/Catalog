@@ -1,4 +1,7 @@
+using Catalog.Api.Common;
 using Catalog.Application.Products.Commands;
+using Catalog.Application.Products.Queries;
+using Catalog.Contracts.Common;
 using Catalog.Contracts.Products;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -7,7 +10,7 @@ namespace Catalog.Api.Controllers;
 
 [ApiController]
 [Route("api/products")]
-public class ProductsController : ControllerBase
+public class ProductsController : BaseApiController
 {
     private readonly IMediator _mediator;
     private readonly ILogger<ProductsController> _logger;
@@ -22,10 +25,10 @@ public class ProductsController : ControllerBase
     /// Create a new product
     /// </summary>
     [HttpPost]
-    [ProducesResponseType(typeof(CreateProductResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<CreateProductResponse>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> CreateProduct([FromBody] CreateProductRequest request)
+    public async Task<IActionResult> CreateProduct([FromBody] CreateProductRequest request, CancellationToken cancellationToken)
     {
         var command = new CreateProductCommand(
             request.Name,
@@ -33,20 +36,22 @@ public class ProductsController : ControllerBase
             request.Price,
             request.StockQuantity);
 
-        var result = await _mediator.Send(command);
+        var result = await _mediator.Send(command, cancellationToken);
 
         if (result.IsFailure)
         {
-            return BadRequest(new ProblemDetails
-            {
-                Title = "Product Creation Failed",
-                Detail = result.Error,
-                Status = StatusCodes.Status400BadRequest
-            });
+            return BadRequest(result.Error, "Product creation failed");
         }
 
-        var response = new CreateProductResponse(result.Value!);
-        return CreatedAtAction(nameof(GetProduct), new { id = result.Value }, response);
+        var product = result.Value!;
+        var response = new CreateProductResponse(
+            product.Id,
+            product.Name,
+            product.Description,
+            product.Price,
+            product.StockQuantity,
+            product.CreatedAt);
+        return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, response, "Product created successfully");
     }
 
     /// <summary>
@@ -55,7 +60,7 @@ public class ProductsController : ControllerBase
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(ProductResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetProduct(Guid id)
+    public async Task<IActionResult> GetProduct([FromRoute] Guid id)
     {
         // This would need a GetProductQuery - simplified for now
         return Ok(new ProductResponse(id, "Sample Product", "Sample Description", 99.99m, 10, true));
@@ -94,17 +99,13 @@ public class ProductsController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<ProductResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetProducts(
-        [FromQuery] string? search, 
+        [FromQuery] string? search,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
     {
-        // This would need a GetProductsQuery - simplified for now
-        var products = new List<ProductResponse>
-        {
-            new(Guid.NewGuid(), "Sample Product 1", "Sample Description 1", 99.99m, 10, true),
-            new(Guid.NewGuid(), "Sample Product 2", "Sample Description 2", 149.99m, 5, true)
-        };
+        var query = new ListProductsQuery();
+        var products = await _mediator.Send(query);
 
-        return Ok(products);
+        return Ok(products.Value);
     }
 }

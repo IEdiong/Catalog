@@ -1,10 +1,12 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Catalog.Api.Filters;
 using Catalog.Api.Middleware;
 using Catalog.Application;
 using Catalog.Infrastructure;
 using Catalog.Infrastructure.Data;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.EntityFrameworkCore;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,11 +22,16 @@ Log.Logger = new LoggerConfiguration()
 builder.Host.UseSerilog();
 
 // Add services to the container
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new() { Title = "Catalog API", Version = "v1" });
+    c.SchemaFilter<ApiResponseSchemaFilter>();
 });
 
 // Add application layers

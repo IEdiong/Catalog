@@ -7,7 +7,7 @@ public class Product : AggregateRoot
 {
     public const int MaxNameLength = 255;
     public const int MaxDescriptionLength = 1000;
-    public const decimal MaxPrice = 1_000_000;
+    public const decimal MaxPrice = 10_000_000;
     public const int MaxStockQuantity = 100_000;
 
     public string Name { get; private set; } = string.Empty;
