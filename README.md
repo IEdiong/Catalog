@@ -149,7 +149,7 @@ The solution follows Clean Architecture principles with clear separation of conc
 5. **Start the application**
 
    ```bash
-   dotnet run --project src/Catalog.Api
+   dotnet run --project src/Catalog.Api --launch-profile https
    ```
 
 6. **Access the API**
