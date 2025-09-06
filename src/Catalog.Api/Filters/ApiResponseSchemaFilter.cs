@@ -24,5 +24,16 @@ public class ApiResponseSchemaFilter : ISchemaFilter
             schema.Required?.Remove("error");
             schema.Required?.Remove("pagination");
         }
+        
+        // Only apply to PaginatedApiResponse<T>
+        if (context.Type.IsGenericType &&
+            context.Type.GetGenericTypeDefinition() == typeof(PaginatedApiResponse<>))
+        {
+            // Remove error property from the schema
+            schema.Properties?.Remove("error");
+            
+            // Also remove it from required properties if it exists
+            schema.Required?.Remove("error");
+        }
     }
 }

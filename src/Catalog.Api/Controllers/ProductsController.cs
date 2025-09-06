@@ -60,7 +60,7 @@ public class ProductsController : BaseApiController
     /// Update a product
     /// </summary>
     [HttpPut("{id:guid}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiResponse<ProductResponse>),StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateProduct(Guid id, [FromBody] UpdateProductRequest request)
@@ -79,20 +79,30 @@ public class ProductsController : BaseApiController
                 detail: result.Error,
                 statusCode: statusCode);
         }
-
-        return NoContent();
+        
+        var product = result.Value!.ToProductResponse();
+        return Ok(product, "Product updated successfully");
     }
 
     /// <summary>
     /// Get a product by ID
     /// </summary>
     [HttpGet("{id:guid}")]
-    [ProducesResponseType(typeof(ProductResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<ProductResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetProduct([FromRoute] Guid id)
     {
-        // This would need a GetProductQuery - simplified for now
-        return Ok(new ProductResponse(id, "Sample Product", "Sample Description", 99.99m, 10, true));
+        var query = new GetProductQuery(id);
+        var result = await _mediator.Send(query);
+        
+        if (result.IsFailure)
+        {
+            return NotFound(result.Error, "Product not found");
+        }
+        
+        var product = result.Value!.ToProductResponse();
+        
+        return Ok(product);
     }
 
     /// <summary>
