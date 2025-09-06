@@ -13,10 +13,10 @@ namespace Catalog.Api.Controllers;
 [Route("api/products")]
 public class ProductsController : BaseApiController
 {
-    private readonly IMediator _mediator;
+    private readonly ISender _mediator;
     private readonly ILogger<ProductsController> _logger;
 
-    public ProductsController(IMediator mediator, ILogger<ProductsController> logger)
+    public ProductsController(ISender mediator, ILogger<ProductsController> logger)
     {
         _mediator = mediator;
         _logger = logger;
@@ -29,7 +29,8 @@ public class ProductsController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse<CreateProductResponse>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> CreateProduct([FromBody] CreateProductRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateProduct([FromBody] CreateProductRequest request,
+        CancellationToken cancellationToken)
     {
         var command = new CreateProductCommand(
             request.Name,
@@ -53,18 +54,6 @@ public class ProductsController : BaseApiController
             product.StockQuantity,
             product.CreatedAt);
         return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, response, "Product created successfully");
-    }
-
-    /// <summary>
-    /// Get a product by ID
-    /// </summary>
-    [HttpGet("{id:guid}")]
-    [ProducesResponseType(typeof(ProductResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetProduct([FromRoute] Guid id)
-    {
-        // This would need a GetProductQuery - simplified for now
-        return Ok(new ProductResponse(id, "Sample Product", "Sample Description", 99.99m, 10, true));
     }
 
     /// <summary>
@@ -95,6 +84,18 @@ public class ProductsController : BaseApiController
     }
 
     /// <summary>
+    /// Get a product by ID
+    /// </summary>
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(ProductResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetProduct([FromRoute] Guid id)
+    {
+        // This would need a GetProductQuery - simplified for now
+        return Ok(new ProductResponse(id, "Sample Product", "Sample Description", 99.99m, 10, true));
+    }
+
+    /// <summary>
     /// Get all active products with search and pagination
     /// </summary>
     [HttpGet]
@@ -109,7 +110,7 @@ public class ProductsController : BaseApiController
         // Validate pagination parameters
         if (page < 1)
             return BadRequest("Page must be greater than 0");
-        
+
         if (pageSize < 1 || pageSize > 100)
             return BadRequest("Page size must be between 1 and 100");
 
@@ -129,5 +130,80 @@ public class ProductsController : BaseApiController
             result.Value.TotalCount);
 
         return Ok(products, pagination, "Products retrieved successfully");
+    }
+
+    /// <summary>
+    /// Soft delete a product (mark as inactive)
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SoftDeleteProduct(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var command = new SoftDeleteProductCommand(id);
+        var result = await _mediator.Send(command, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            if (result.Error.Contains("not found"))
+                return NotFound(result.Error, "Product not found");
+
+            return BadRequest(result.Error, "Failed to delete product");
+        }
+
+        return Ok("Product deleted successfully");
+    }
+
+    /// <summary>
+    /// Permanently delete a product from the database
+    /// </summary>
+    [HttpDelete("{id:guid}/permanent")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> HardDeleteProduct(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var command = new HardDeleteProductCommand(id);
+        var result = await _mediator.Send(command, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            if (result.Error.Contains("not found"))
+                return NotFound(result.Error, "Product not found");
+
+            return BadRequest(result.Error, "Failed to permanently delete product");
+        }
+
+        return Ok("Product permanently deleted");
+    }
+
+    /// <summary>
+    /// Restore a soft-deleted product
+    /// </summary>
+    [HttpPatch("{id:guid}/restore")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> RestoreProduct(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var command = new RestoreProductCommand(id);
+        var result = await _mediator.Send(command, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            if (result.Error.Contains("not found"))
+                return NotFound(result.Error, "Product not found");
+
+            return BadRequest(result.Error, "Failed to restore product");
+        }
+
+        return Ok("Product restored successfully");
     }
 }

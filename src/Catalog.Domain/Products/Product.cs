@@ -112,6 +112,32 @@ public class Product : AggregateRoot
         AddDomainEvent(new ProductActivatedEvent(Id));
         return Result.Success();
     }
+    
+    public Result SoftDelete()
+    {
+        if (!IsActive)
+            return Result.Failure("Product is already deleted");
+            
+        IsActive = false;
+        UpdatedAt = DateTime.UtcNow;
+        Version++;
+        
+        AddDomainEvent(new ProductSoftDeletedEvent(Id));
+        return Result.Success();
+    }
+    
+    public Result Restore()
+    {
+        if (IsActive)
+            return Result.Failure("Product is already active");
+            
+        IsActive = true;
+        UpdatedAt = DateTime.UtcNow;
+        Version++;
+        
+        AddDomainEvent(new ProductRestoredEvent(Id));
+        return Result.Success();
+    }
 
     private void SetName(string name)
     {
