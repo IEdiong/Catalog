@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
+using Catalog.Api.Configurations;
 using Catalog.Api.Filters;
 using Catalog.Api.Middleware;
 using Catalog.Application;
@@ -9,8 +10,9 @@ using Catalog.Infrastructure;
 using Catalog.Infrastructure.Data;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.OpenApi.Models;
+using Microsoft.Extensions.Options;
 using Serilog;
+using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,22 +51,9 @@ builder.Services.AddApiVersioning(options =>
     });
 
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, SwaggerConfiguration>();
 builder.Services.AddSwaggerGen(c =>
 {
-    // Configure Swagger to use API versioning
-    var provider = builder.Services.BuildServiceProvider().GetRequiredService<IApiVersionDescriptionProvider>();
-
-    foreach (var description in provider.ApiVersionDescriptions)
-    {
-        c.SwaggerDoc(description.GroupName, new OpenApiInfo
-        {
-            Title = "Catalog API",
-            Version = description.ApiVersion.ToString(),
-            Description = $"Catalog API {description.ApiVersion}"
-        });
-    }
-
-    // c.SwaggerDoc("v1.0", new OpenApiInfo { Title = "Catalog API", Version = "v1.0" });
     c.SchemaFilter<ApiResponseSchemaFilter>();
 });
 
@@ -98,14 +87,14 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        // c.SwaggerEndpoint("/swagger/v1.0/swagger.json", "Catalog API v1.0");
+        // Now we can safely access services since the app is built
         var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
-
+        
         foreach (var description in provider.ApiVersionDescriptions)
         {
             c.SwaggerEndpoint(
                 $"/swagger/{description.GroupName}/swagger.json",
-                $"Catalog API version {description.ApiVersion}");
+                $"Catalog API v{description.ApiVersion}");
         }
     });
 }
