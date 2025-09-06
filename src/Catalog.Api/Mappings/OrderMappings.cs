@@ -24,7 +24,7 @@ public static class OrderMappings
                 .ToList());
     }
 
-    public static IEnumerable<OrderResponse> TOrderResponses(this IEnumerable<Order> orders)
+    public static IEnumerable<OrderResponse> ToOrderResponses(this IEnumerable<Order> orders)
     {
         return orders.Select(ToOrderResponse);
     }

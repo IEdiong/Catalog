@@ -2,6 +2,8 @@ using Catalog.Api.Common;
 using Catalog.Api.Mappings;
 using Catalog.Application.Orders.Commands;
 using Catalog.Application.Orders.Queries.GetOrder;
+using Catalog.Application.Orders.Queries.ListOrdersByEmail;
+using Catalog.Contracts.Common;
 using Catalog.Contracts.Orders;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -81,14 +83,44 @@ public class OrdersController: BaseApiController
     }
 
     /// <summary>
-    /// Get orders by customer email
+    /// Get orders by customer email with pagination and search
     /// </summary>
     [HttpGet("customer/{email}")]
-    [ProducesResponseType(typeof(IEnumerable<OrderResponse>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetOrdersByCustomer(string email)
+    [ProducesResponseType(typeof(PaginatedApiResponse<OrderResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetOrdersByCustomer(
+        [FromRoute] string email,
+        [FromQuery] string? search = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken cancellationToken = default)
     {
-        // This would need a GetOrdersByCustomerQuery - simplified for now
-        var orders = new List<OrderResponse>();
-        return Ok(orders);
+        // Validate pagination parameters
+        if (page < 1)
+            return BadRequest("Page number must be at least 1");
+        
+        if (pageSize < 1 || pageSize > 100)
+            return BadRequest("Page size must be between 1 and 100");
+
+        // Validate email format (basic validation)
+        if (string.IsNullOrWhiteSpace(email))
+            return BadRequest("Customer email is required");
+
+        var query = new ListOrdersByEmailQuery(email, search, page, pageSize);
+        var result = await _mediator.Send(query, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return BadRequest(result.Error, "Failed to retrieve orders");
+        }
+
+        // Map domain entities to DTOs
+        var orders = result.Value!.Orders.ToOrderResponses();
+        var pagination = new PaginationMeta(
+            result.Value.Page,
+            result.Value.PageSize,
+            result.Value.TotalCount);
+
+        return Ok(orders, pagination, "Orders retrieved successfully");
     }
 }
