@@ -1,4 +1,5 @@
 using Catalog.Api.Common;
+using Catalog.Api.Mappings;
 using Catalog.Application.Products.Commands;
 using Catalog.Application.Products.Queries;
 using Catalog.Contracts.Common;
@@ -94,18 +95,39 @@ public class ProductsController : BaseApiController
     }
 
     /// <summary>
-    /// Get all active products
+    /// Get all active products with search and pagination
     /// </summary>
     [HttpGet]
-    [ProducesResponseType(typeof(IEnumerable<ProductResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PaginatedApiResponse<ProductResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetProducts(
         [FromQuery] string? search,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10)
+        [FromQuery] int pageSize = 10,
+        CancellationToken cancellationToken = default)
     {
-        var query = new ListProductsQuery();
-        var products = await _mediator.Send(query);
+        // Validate pagination parameters
+        if (page < 1)
+            return BadRequest("Page must be greater than 0");
+        
+        if (pageSize < 1 || pageSize > 100)
+            return BadRequest("Page size must be between 1 and 100");
 
-        return Ok(products.Value);
+        var query = new ListProductsQuery(search, page, pageSize);
+        var result = await _mediator.Send(query, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return BadRequest(result.Error, "Failed to retrieve products");
+        }
+
+        // Map domain entities to DTOs in the API layer
+        var products = result.Value!.Products.ToProductResponses();
+        var pagination = new PaginationMeta(
+            result.Value.Page,
+            result.Value.PageSize,
+            result.Value.TotalCount);
+
+        return Ok(products, pagination, "Products retrieved successfully");
     }
 }
