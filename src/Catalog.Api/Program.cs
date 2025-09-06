@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Asp.Versioning;
+using Asp.Versioning.ApiExplorer;
 using Catalog.Api.Filters;
 using Catalog.Api.Middleware;
 using Catalog.Application;
@@ -7,6 +9,7 @@ using Catalog.Infrastructure;
 using Catalog.Infrastructure.Data;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.OpenApi.Models;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -27,10 +30,41 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
     options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
 });
+
+// Add API Versioning
+builder.Services.AddApiVersioning(options =>
+    {
+        options.DefaultApiVersion = new ApiVersion(1, 0);
+        options.AssumeDefaultVersionWhenUnspecified = false;
+        options.ApiVersionReader = ApiVersionReader.Combine(
+            new UrlSegmentApiVersionReader(),
+            new QueryStringApiVersionReader("version"),
+            new HeaderApiVersionReader("X-Version"),
+            new MediaTypeApiVersionReader("ver"));
+    })
+    .AddApiExplorer(options =>
+    {
+        options.GroupNameFormat = "'v'VVV";
+        options.SubstituteApiVersionInUrl = true;
+    });
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new() { Title = "Catalog API", Version = "v1" });
+    // Configure Swagger to use API versioning
+    var provider = builder.Services.BuildServiceProvider().GetRequiredService<IApiVersionDescriptionProvider>();
+
+    foreach (var description in provider.ApiVersionDescriptions)
+    {
+        c.SwaggerDoc(description.GroupName, new OpenApiInfo
+        {
+            Title = "Catalog API",
+            Version = description.ApiVersion.ToString(),
+            Description = $"Catalog API {description.ApiVersion}"
+        });
+    }
+
+    // c.SwaggerDoc("v1.0", new OpenApiInfo { Title = "Catalog API", Version = "v1.0" });
     c.SchemaFilter<ApiResponseSchemaFilter>();
 });
 
@@ -40,8 +74,8 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 // Add health checks
 builder.Services.AddHealthChecks()
-    .AddNpgSql(builder.Configuration.GetConnectionString("DefaultConnection") ?? 
-        "Host=localhost;Database=CatalogDb;Username=postgres;Password=postgres");
+    .AddNpgSql(builder.Configuration.GetConnectionString("DefaultConnection") ??
+               "Host=localhost;Database=CatalogDb;Username=postgres;Password=postgres");
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -49,8 +83,8 @@ builder.Services.AddCors(options =>
     options.AddPolicy("DefaultPolicy", policy =>
     {
         policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+            .AllowAnyMethod()
+            .AllowAnyHeader();
     });
 });
 
@@ -62,7 +96,18 @@ app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        // c.SwaggerEndpoint("/swagger/v1.0/swagger.json", "Catalog API v1.0");
+        var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+
+        foreach (var description in provider.ApiVersionDescriptions)
+        {
+            c.SwaggerEndpoint(
+                $"/swagger/{description.GroupName}/swagger.json",
+                $"Catalog API version {description.ApiVersion}");
+        }
+    });
 }
 
 app.UseSerilogRequestLogging();

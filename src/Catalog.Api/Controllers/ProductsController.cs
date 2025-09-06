@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Catalog.Api.Common;
 using Catalog.Api.Mappings;
 using Catalog.Application.Products.Commands;
@@ -10,7 +11,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Catalog.Api.Controllers;
 
 [ApiController]
-[Route("api/products")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/products")]
 public class ProductsController : BaseApiController
 {
     private readonly ISender _mediator;

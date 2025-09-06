@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Catalog.Api.Common;
 using Catalog.Api.Mappings;
 using Catalog.Application.Orders.Commands;
@@ -11,7 +12,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Catalog.Api.Controllers;
 
 [ApiController]
-[Route("api/orders")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/orders")]
 public class OrdersController: BaseApiController
 {
     private readonly IMediator _mediator;
