@@ -1,4 +1,7 @@
+using Catalog.Api.Common;
+using Catalog.Api.Mappings;
 using Catalog.Application.Orders.Commands;
+using Catalog.Application.Orders.Queries.GetOrder;
 using Catalog.Contracts.Orders;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -7,7 +10,7 @@ namespace Catalog.Api.Controllers;
 
 [ApiController]
 [Route("api/orders")]
-public class OrdersController : ControllerBase
+public class OrdersController: BaseApiController
 {
     private readonly IMediator _mediator;
     private readonly ILogger<OrdersController> _logger;
@@ -63,24 +66,17 @@ public class OrdersController : ControllerBase
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(OrderResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetOrder(Guid id)
+    public async Task<IActionResult> GetOrder([FromRoute] Guid id)
     {
-        // This would need a GetOrderQuery - simplified for now
-        var orderItems = new List<OrderItemResponse>
+        var query = new GetOrderQuery(id);
+        var result = await _mediator.Send(query);
+
+        if (result.IsFailure)
         {
-            new(Guid.NewGuid(), "Sample Product", 99.99m, 2, 199.98m)
-        };
-
-        var response = new OrderResponse(
-            id, 
-            "John Doe", 
-            "john@example.com", 
-            "Pending", 
-            199.98m, 
-            DateTime.UtcNow, 
-            null, 
-            orderItems);
-
+            return NotFound(result.Error, "Order not found");
+        }
+        
+        var response = result.Value!.ToOrderResponse();
         return Ok(response);
     }
 

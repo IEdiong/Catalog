@@ -44,7 +44,7 @@ public class ProductRepository : Repository<Product>, IProductRepository
     {
         // Use FromSqlRaw for row-level locking in PostgreSQL
         // This will acquire a FOR UPDATE lock on the specific row
-        var sql = "SELECT * FROM \"Products\" WHERE \"Id\" = {0} FOR UPDATE";
+        const string sql = "SELECT * FROM \"Products\" WHERE \"Id\" = {0} FOR UPDATE";
         return await DbSet
             .FromSqlRaw(sql, id)
             .FirstOrDefaultAsync(cancellationToken);
